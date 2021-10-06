@@ -17,58 +17,63 @@ PORT = cloud_config.get("port", 8086)
 DBNAME = cloud_config.get("dbname", "")
 USERNAME = cloud_config.get("username", "")
 PASSWORD = cloud_config.get("password", "")
+INTERVAL = cloud_config.get("interval", 10)
+
 logger = InfluxLogger(DB_URL, PORT, USERNAME, PASSWORD, DBNAME)
 koruza_proxy = xmlrpc.client.ServerProxy(f"http://localhost:{KORUZA_MAIN_PORT}", allow_none=True)
 
 while True:
     
-    ## PRIMARY UNIT DATA
+    ## local unit data
     try:
-        unit_id = koruza_proxy.get_unit_id()
+        local_unit_id = koruza_proxy.get_unit_id()
     except Exception as e:
-        unit_id = "Not Set"
+        local_unit_id = "Not Set"
     
     try:
-        x, y = koruza_proxy.get_motors_position()
+        local_motor_x, local_motor_y = koruza_proxy.get_motors_position()
     except Exception as e:
-        x = None
-        y = None
+        local_motor_x = None
+        local_motor_y = None
 
     sfp_data = None
     try:
         sfp_data = koruza_proxy.get_sfp_diagnostics()
     except Exception as e:
-        rx_dBm = None
+        local_rx_dBm = None
     if sfp_data is not None:
-        rx_dBm = sfp_data.get("sfp_0", {}).get("diagnostics", {}).get("rx_power_dBm", -40)
+        local_rx_dBm = sfp_data.get("sfp_0", {}).get("diagnostics", {}).get("rx_power_dBm", -40)
 
-    primary_data = {"x": x, "y": y, "rx_power_dBm": rx_dBm}
+    local_data = {"x": local_motor_x, "y": local_motor_y, "rx_power_dBm": local_rx_dBm}
 
     timestamp = time.time_ns()
-    logger.save_influx_data(unit_id, primary_data, timestamp)
+    logger.save_influx_data(local_unit_id, local_data, timestamp)
 
-    if mode == "secondary":
-        ## SECONDARY UNIT DATA
+    if mode == "primary":
+        ## send secondary unit data as well
         try:
-            motor_x, motor_y = koruza_proxy.issue_remote_command("get_motors_position", ())
+            remote_unit_id = koruza_proxy.issue_remote_command("get_unit_id", ())
         except Exception as e:
-            x = None
-            y = None
+            remote_unit_id = "Not Set"
+
+        remote_motor_x = None
+        remote_motor_y = None
+        try:
+            remote_motor_x, remote_motor_y = koruza_proxy.issue_remote_command("get_motors_position", ())
+        except Exception as e:
+            remote_motor_x = None
+            remote_motor_y = None
         
         sfp_data = None
         try:
             sfp_data = koruza_proxy.issue_remote_command("get_sfp_diagnostics", ())
         except Exception as e:
-            rx_dBm = None
+            remote_rx_dBm = None
         if sfp_data is not None:
-            rx_dBm = sfp_data.get("sfp_0", {}).get("diagnostics", {}).get("rx_power_dBm", -40)
+            remote_rx_dBm = sfp_data.get("sfp_0", {}).get("diagnostics", {}).get("rx_power_dBm", -40)
             
-        secondary_data = {"x": x, "y": y, "rx_power_dBm": rx_dBm}
-        try:
-            unit_id = koruza_proxy.issue_remote_command("get_unit_id", ())
-        except Exception as e:
-            unit_id = "Not Set"
+        remote_data = {"x": remote_motor_x, "y": remote_motor_y, "rx_power_dBm": remote_rx_dBm}
         timestamp = time.time_ns()
-        logger.save_influx_data(unit_id, secondary_data, timestamp)
+        logger.save_influx_data(remote_unit_id, remote_data, timestamp)
 
-    time.sleep(10)
+    time.sleep(INTERVAL)
