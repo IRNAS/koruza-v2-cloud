@@ -42,9 +42,9 @@ while True:
     except Exception as e:
         local_rx_dBm = None
     if sfp_data is not None:
-        local_rx_dBm = sfp_data.get("sfp_0", {}).get("diagnostics", {}).get("rx_power_dBm", -40.0)
+        local_rx_dBm = float(sfp_data.get("sfp_0", {}).get("diagnostics", {}).get("rx_power_dBm", -40.0))
 
-    local_data = {"x": local_motor_x, "y": local_motor_y, "rx_power_dBm": float(local_rx_dBm)}
+    local_data = {"x": local_motor_x, "y": local_motor_y, "rx_power_dBm": local_rx_dBm}
 
     timestamp = time.time_ns()
     logger.save_influx_data(local_unit_id, local_data, timestamp)
@@ -70,9 +70,9 @@ while True:
         except Exception as e:
             remote_rx_dBm = None
         if sfp_data is not None:
-            remote_rx_dBm = sfp_data.get("sfp_0", {}).get("diagnostics", {}).get("rx_power_dBm", -40.0)
+            remote_rx_dBm = float(sfp_data.get("sfp_0", {}).get("diagnostics", {}).get("rx_power_dBm", -40.0))
             
-        remote_data = {"x": remote_motor_x, "y": remote_motor_y, "rx_power_dBm": float(remote_rx_dBm)}
+        remote_data = {"x": remote_motor_x, "y": remote_motor_y, "rx_power_dBm": remote_rx_dBm}
         timestamp = time.time_ns()
         logger.save_influx_data(remote_unit_id, remote_data, timestamp)
 
